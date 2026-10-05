@@ -1,0 +1,116 @@
+---
+title: "DATA 607 Assignment 5A - Airline Delays"
+author: "Muntasir Mehran"
+date: "2026-10-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Airline Delay Data
+
+The given data had arrival information for Alaska Airlines and AM West throughout five destinations. I first recreated the data in a wide form alike to the original source table.
+
+```{r create-data}
+airline_data <- data.frame(
+  Airline = c("ALASKA", "", "AM WEST", ""),
+  Status = c("on time", "delayed", "on time", "delayed"),
+  Los_Angeles = c(497, 62, 694, 117),
+  Phoenix = c(221, 12, 4840, 415),
+  San_Diego = c(212, 20, 383, 65),
+  San_Francisco = c(503, 102, 320, 129),
+  Seattle = c(1841, 305, 201, 61)
+)
+
+airline_data
+
+write.csv(airline_data, "airline_delays.csv", row.names = FALSE)
+```
+
+## Reading CSV
+I plan to read the CSV file into R in order to clean and tranform the data.
+
+```{r}
+airline_raw <- read.csv("airline_delays.csv")
+
+airline_raw
+```
+
+## Clean Vacant Ariline Names
+The given table has vacancies on the airline name on each delayed row because the airline name is implied by the row above it. I converted these blank values to missing values and then filled them using the aforementioned airline name.
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+airline_clean <- airline_raw %>%
+  mutate(Airline = na_if(Airline, "")) %>%
+  fill(Airline)
+
+airline_clean
+```
+## Tranformation - wide to long
+To make tidy the data, I have to transform the five destination columns into two variable - destination city & # of flights.
+```{r}
+airline_long <- airline_clean %>%
+  pivot_longer(
+    cols = Los_Angeles:Seattle,
+    names_to = "City",
+    values_to = "Flights"
+  )
+
+airline_long
+```
+
+## Airline Analysis
+I first compared the general percentage of delayed flights for every airline. Utilizing percentages unstead of just counts makes for a more compelling comparison since the airlines contain distinct total flight counts.
+```{r}
+overall_delays <- airline_long %>%
+  group_by(Airline, Status) %>%
+  summarise(Flights = sum(Flights), .groups = "drop") %>%
+  group_by(Airline) %>%
+  mutate(Percentage = Flights / sum(Flights) * 100)
+
+overall_delays
+```
+In general, Alaska had a delay rate of about 13.27 % wheras AM West had a delay rate of about 10.89%. From this reading, AM West is apparently better due to a more efficent timing. 
+
+#Delay Rates Across Cities 
+```{r}
+city_delays <- airline_long %>%
+  group_by(Airline, City) %>%
+  mutate(
+    Total_Flights = sum(Flights),
+    Percentage = Flights / Total_Flights * 100
+  ) %>%
+  filter(Status == "delayed") %>%
+  select(Airline, City, Flights, Total_Flights, Percentage)
+
+city_delays
+```
+
+    Glancing at the airlines idnicate that throughout the 5 destinations, Alaska has a lower delay percentage than AM West in each city. This is different from the general comparison, where AM West had the lower all-in-all delay percentage. Thus, the city-by-city analysis paints a different story. 
+    This difference happens because of distinct distributions of flights throughout the five cities. For instance, AM West contains a great count of flights in Phoeniz, where both airlines have fairly low delay rates. Alska, on the other hand, has a large # of flights in Seattle, in which delay rates tend to be higher. Consequently, combining all cities shifts the weight of the observations and allows AM West's general delay rate seem lower despite Alska performing on its individual urban locales.
+
+## Added Visual
+```{r}
+library(ggplot2)
+
+ggplot(city_delays, aes(x = City, y = Percentage, fill = Airline)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Airline Delay Percentages by City",
+    x = "City",
+    y = "Delay Percentage"
+  ) +
+  theme_minimal()
+```
+
+## Conclusion
+
+  Ultimately, the percentages provides ample telling of AM West's delay rate. Around 10.89% of AM West flights were delayed compared to about 13.27% of Alaska flights. Looking at the general results, AM West seems to have done better.
+  Taking a more urban focus showcases that Alaska had a lower delay percentage than AM West in all 5 spots. This implies that overall percentages don't give the clear picture.
+  The difference essentially comes from hwo flights are distributed throughout cities. AM West contained a plethora of flights in Phoeniz, where delay rates were more or less low, while Alaska contained numerous flights in Seattle, where the delay rates were noticeably greater.
+    
